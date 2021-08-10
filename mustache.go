@@ -18,6 +18,11 @@ var (
 	// is true (the default), an empty string is emitted. If it is false, an error
 	// is generated instead.
 	AllowMissingVariables = true
+
+	// AllowKinds defines what types of data can be injected into variables.
+	// If data kind retrieved from context does not match one of defined kinds,
+	// an error is generated.
+	AllowKinds []reflect.Kind = nil
 )
 
 // A TagType represents the specific type of mustache tag that a Tag
@@ -175,7 +180,7 @@ func (p parseError) Error() string {
 func (tmpl *Template) readString(s string) (string, error) {
 	newlines := 0
 	for i := tmpl.p; ; i++ {
-		//are we at the end of the string?
+		// are we at the end of the string?
 		if i+len(s) > len(tmpl.data) {
 			return tmpl.data[tmpl.p:], io.EOF
 		}
@@ -263,13 +268,13 @@ func (tmpl *Template) readTag(mayStandalone bool) (*tagReadingResult, error) {
 	}
 
 	if err == io.EOF {
-		//put the remaining text in a block
+		// put the remaining text in a block
 		return nil, parseError{tmpl.curline, "unmatched open tag"}
 	}
 
 	text = text[:len(text)-len(tmpl.ctag)]
 
-	//trim the close tag off the text
+	// trim the close tag off the text
 	tag := strings.TrimSpace(text)
 	if len(tag) == 0 {
 		return nil, parseError{tmpl.curline, "empty tag"}
@@ -327,7 +332,7 @@ func (tmpl *Template) parseSection(section *sectionElement) error {
 		mayStandalone := textResult.mayStandalone
 
 		if err == io.EOF {
-			//put the remaining text in a block
+			// put the remaining text in a block
 			return parseError{section.startline, "Section " + section.name + " has no closing tag"}
 		}
 
@@ -346,7 +351,7 @@ func (tmpl *Template) parseSection(section *sectionElement) error {
 		tag := tagResult.tag
 		switch tag[0] {
 		case '!':
-			//ignore comment
+			// ignore comment
 			break
 		case '#', '^':
 			name := strings.TrimSpace(tag[1:])
@@ -381,7 +386,7 @@ func (tmpl *Template) parseSection(section *sectionElement) error {
 			}
 		case '{':
 			if tag[len(tag)-1] == '}' {
-				//use a raw tag
+				// use a raw tag
 				name := strings.TrimSpace(tag[1 : len(tag)-1])
 				section.elems = append(section.elems, &varElement{name, true})
 			}
@@ -402,7 +407,7 @@ func (tmpl *Template) parse() error {
 		mayStandalone := textResult.mayStandalone
 
 		if err == io.EOF {
-			//put the remaining text in a block
+			// put the remaining text in a block
 			tmpl.elems = append(tmpl.elems, &textElement{[]byte(text)})
 			return nil
 		}
@@ -422,7 +427,7 @@ func (tmpl *Template) parse() error {
 		tag := tagResult.tag
 		switch tag[0] {
 		case '!':
-			//ignore comment
+			// ignore comment
 			break
 		case '#', '^':
 			name := strings.TrimSpace(tag[1:])
@@ -452,7 +457,7 @@ func (tmpl *Template) parse() error {
 				tmpl.ctag = newtags[1]
 			}
 		case '{':
-			//use a raw tag
+			// use a raw tag
 			if tag[len(tag)-1] == '}' {
 				name := strings.TrimSpace(tag[1 : len(tag)-1])
 				tmpl.elems = append(tmpl.elems, &varElement{name, true})
@@ -578,6 +583,10 @@ func renderSection(section *sectionElement, contextChain []interface{}, buf io.W
 		return nil
 	} else if !section.inverted {
 		valueInd := indirect(value)
+		if err = checkAllowed(valueInd); err != nil {
+			return err
+		}
+
 		switch val := valueInd; val.Kind() {
 		case reflect.Slice:
 			for i := 0; i < val.Len(); i++ {
@@ -601,7 +610,7 @@ func renderSection(section *sectionElement, contextChain []interface{}, buf io.W
 
 	chain2 := make([]interface{}, len(contextChain)+1)
 	copy(chain2[1:], contextChain)
-	//by default we execute the section
+	// by default we execute the section
 	for _, ctx := range contexts {
 		chain2[0] = ctx
 		for _, elem := range section.elems {
@@ -630,6 +639,10 @@ func renderElement(element interface{}, contextChain []interface{}, buf io.Write
 		}
 
 		if val.IsValid() {
+			if err = checkAllowed(val); err != nil {
+				return err
+			}
+
 			if elem.raw {
 				fmt.Fprint(buf, val.Interface())
 			} else {
@@ -887,4 +900,24 @@ func RenderFileInLayout(filename string, layoutFile string, context ...interface
 		return "", err
 	}
 	return tmpl.RenderInLayout(layoutTmpl, context...)
+}
+
+func checkAllowed(value reflect.Value) error {
+	if AllowKinds != nil {
+		kind := value.Kind()
+		allowed := false
+
+		for _, allowedKind := range AllowKinds {
+			if kind == allowedKind {
+				allowed = true
+				break
+			}
+		}
+
+		if !allowed {
+			return fmt.Errorf("Cannot inject data of type '%s'", kind)
+		}
+	}
+
+	return nil
 }

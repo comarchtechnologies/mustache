@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -94,7 +95,7 @@ var tests = []Test{
 	{`{{ a }}{{=<% %>=}}<%b %><%={{ }}=%>{{ c }}`, map[string]string{"a": "a", "b": "b", "c": "c"}, "abc", nil},
 	{`{{ a }}{{= <% %> =}}<%b %><%= {{ }}=%>{{c}}`, map[string]string{"a": "a", "b": "b", "c": "c"}, "abc", nil},
 
-	//section tests
+	// section tests
 	{`{{#A}}{{B}}{{/A}}`, Data{true, "hello"}, "hello", nil},
 	{`{{#A}}{{{B}}}{{/A}}`, Data{true, "5 > 2"}, "5 > 2", nil},
 	{`{{#A}}{{B}}{{/A}}`, Data{true, "5 > 2"}, "5 &gt; 2", nil},
@@ -126,7 +127,7 @@ var tests = []Test{
 	{"{{#users}}\n{{Name}}\n{{/users}}", map[string]interface{}{"users": makeVector(2)}, "Mike\nMike\n", nil},
 	{"{{#users}}\r\n{{Name}}\r\n{{/users}}", map[string]interface{}{"users": makeVector(2)}, "Mike\r\nMike\r\n", nil},
 
-	//falsy: golang zero values
+	// falsy: golang zero values
 	{"{{#a}}Hi {{.}}{{/a}}", map[string]interface{}{"a": nil}, "", nil},
 	{"{{#a}}Hi {{.}}{{/a}}", map[string]interface{}{"a": false}, "", nil},
 	{"{{#a}}Hi {{.}}{{/a}}", map[string]interface{}{"a": 0}, "", nil},
@@ -135,7 +136,7 @@ var tests = []Test{
 	{"{{#a}}Hi {{.}}{{/a}}", map[string]interface{}{"a": Data{}}, "", nil},
 	{"{{#a}}Hi {{.}}{{/a}}", map[string]interface{}{"a": []interface{}{}}, "", nil},
 	{"{{#a}}Hi {{.}}{{/a}}", map[string]interface{}{"a": [0]interface{}{}}, "", nil},
-	//falsy: special cases we disagree with golang
+	// falsy: special cases we disagree with golang
 	{"{{#a}}Hi {{.}}{{/a}}", map[string]interface{}{"a": "\t"}, "", nil},
 	{"{{#a}}Hi {{.}}{{/a}}", map[string]interface{}{"a": []interface{}{0}}, "Hi 0", nil},
 	{"{{#a}}Hi {{.}}{{/a}}", map[string]interface{}{"a": [1]interface{}{0}}, "Hi 0", nil},
@@ -143,7 +144,7 @@ var tests = []Test{
 	// non-false section have their value at the top of the context
 	{"{{#a}}Hi {{.}}{{/a}}", map[string]interface{}{"a": "Rob"}, "Hi Rob", nil},
 
-	//section does not exist
+	// section does not exist
 	{`{{#has}}{{/has}}`, &User{"Mike", 1}, "", nil},
 
 	// implicit iterator tests
@@ -151,7 +152,7 @@ var tests = []Test{
 	{`"{{#list}}({{.}}){{/list}}"`, map[string]interface{}{"list": []int{1, 2, 3, 4, 5}}, "\"(1)(2)(3)(4)(5)\"", nil},
 	{`"{{#list}}({{.}}){{/list}}"`, map[string]interface{}{"list": []float64{1.10, 2.20, 3.30, 4.40, 5.50}}, "\"(1.1)(2.2)(3.3)(4.4)(5.5)\"", nil},
 
-	//inverted section tests
+	// inverted section tests
 	{`{{a}}{{^b}}b{{/b}}{{c}}`, map[string]interface{}{"a": "a", "b": false, "c": "c"}, "abc", nil},
 	{`{{^a}}b{{/a}}`, map[string]interface{}{"a": false}, "b", nil},
 	{`{{^a}}b{{/a}}`, map[string]interface{}{"a": true}, "", nil},
@@ -159,7 +160,7 @@ var tests = []Test{
 	{`{{^a}}b{{/a}}`, map[string]interface{}{"a": []string{}}, "b", nil},
 	{`{{a}}{{^b}}b{{/b}}{{c}}`, map[string]string{"a": "a", "c": "c"}, "abc", nil},
 
-	//function tests
+	// function tests
 	{`{{#users}}{{Func1}}{{/users}}`, map[string]interface{}{"users": []User{{"Mike", 1}}}, "Mike", nil},
 	{`{{#users}}{{Func1}}{{/users}}`, map[string]interface{}{"users": []*User{{"Mike", 1}}}, "Mike", nil},
 	{`{{#users}}{{Func2}}{{/users}}`, map[string]interface{}{"users": []*User{{"Mike", 1}}}, "Mike", nil},
@@ -173,7 +174,7 @@ var tests = []Test{
 	{`{{#user}}{{#Func5}}{{#Allow}}abcd{{/Allow}}{{/Func5}}{{/user}}`, map[string]interface{}{"user": &User{"Mike", 1}}, "abcd", nil},
 	{`{{#user}}{{#Func6}}{{#Allow}}abcd{{/Allow}}{{/Func6}}{{/user}}`, map[string]interface{}{"user": &User{"Mike", 1}}, "abcd", nil},
 
-	//context chaining
+	// context chaining
 	{`hello {{#section}}{{name}}{{/section}}`, map[string]interface{}{"section": map[string]string{"name": "world"}}, "hello world", nil},
 	{`hello {{#section}}{{name}}{{/section}}`, map[string]interface{}{"name": "bob", "section": map[string]string{"name": "world"}}, "hello world", nil},
 	{`hello {{#bool}}{{#section}}{{name}}{{/section}}{{/bool}}`, map[string]interface{}{"bool": true, "section": map[string]string{"name": "world"}}, "hello world", nil},
@@ -200,7 +201,7 @@ var tests = []Test{
 			},
 		}, "working", nil},
 
-	//dotted names(dot notation)
+	// dotted names(dot notation)
 	{`"{{person.name}}" == "{{#person}}{{name}}{{/person}}"`, map[string]interface{}{"person": map[string]string{"name": "Joe"}}, `"Joe" == "Joe"`, nil},
 	{`"{{{person.name}}}" == "{{#person}}{{{name}}}{{/person}}"`, map[string]interface{}{"person": map[string]string{"name": "Joe"}}, `"Joe" == "Joe"`, nil},
 	{`"{{a.b.c.d.e.name}}" == "Phil"`, map[string]interface{}{"a": map[string]interface{}{"b": map[string]interface{}{"c": map[string]interface{}{"d": map[string]interface{}{"e": map[string]string{"name": "Phil"}}}}}}, `"Phil" == "Phil"`, nil},
@@ -232,11 +233,11 @@ func TestBasic(t *testing.T) {
 }
 
 var missing = []Test{
-	//does not exist
+	// does not exist
 	{`{{dne}}`, map[string]string{"name": "world"}, "", nil},
 	{`{{dne}}`, User{"Mike", 1}, "", nil},
 	{`{{dne}}`, &User{"Mike", 1}, "", nil},
-	//dotted names(dot notation)
+	// dotted names(dot notation)
 	{`"{{a.b.c}}" == ""`, map[string]interface{}{}, `"" == ""`, nil},
 	{`"{{a.b.c.name}}" == ""`, map[string]interface{}{"a": map[string]interface{}{"b": map[string]string{}}, "c": map[string]string{"name": "Jim"}}, `"" == ""`, nil},
 	{`{{#a}}{{b.c}}{{/a}}`, map[string]interface{}{"a": map[string]interface{}{"b": map[string]string{}}, "b": map[string]string{"c": "ERROR"}}, "", nil},
@@ -262,6 +263,46 @@ func TestMissing(t *testing.T) {
 			t.Errorf("%q expected missing variable error but got %q", test.tmpl, output)
 		} else if !strings.Contains(err.Error(), "Missing variable") {
 			t.Errorf("%q expected missing variable error but got %q", test.tmpl, err.Error())
+		}
+	}
+}
+
+var allowed = []Test{
+	{tmpl: "{{array}}", context: map[string]interface{}{"array": [2]int{1, 2}}, expected: "[1 2]", err: nil},
+	{tmpl: "{{slice}}", context: map[string]interface{}{"slice": []int{1, 2}}, expected: "[1 2]", err: nil},
+	{tmpl: "{{map}}", context: map[string]interface{}{"map": map[string]interface{}{"a": "a"}}, expected: "map[a:a]", err: nil},
+	{tmpl: "{{struct}}", context: map[string]interface{}{"struct": struct{ a int }{1}}, expected: "{1}", err: nil},
+	{tmpl: "{{interface}}", context: map[string]interface{}{"interface": interface{}("a")}, expected: "a", err: nil},
+	{tmpl: "{{ptr}}", context: map[string]interface{}{"ptr": (*int)(nil)}, expected: "&lt;nil&gt;", err: nil},
+}
+
+func TestAllow(t *testing.T) {
+	// Default behavior, AllowKinds=nil
+	for _, test := range allowed {
+		output, err := Render(test.tmpl, test.context)
+		if err != nil {
+			t.Error(err)
+		} else if output != test.expected {
+			t.Errorf("%q expected %q got %q", test.tmpl, test.expected, output)
+		}
+	}
+
+	// Now set AllowKinds to primitives and confirm we get errors.
+	AllowKinds = []reflect.Kind{
+		reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64,
+		reflect.Complex64, reflect.Complex128,
+		reflect.String,
+	}
+	defer func() { AllowKinds = nil }()
+	for _, test := range allowed {
+		output, err := Render(test.tmpl, test.context)
+		if err == nil {
+			t.Errorf("%q expected injected type error but got %q", test.tmpl, output)
+		} else if !strings.Contains(err.Error(), "Cannot inject data of type") {
+			t.Errorf("%q expected injected type error but got %q", test.tmpl, err.Error())
 		}
 	}
 }
@@ -354,7 +395,7 @@ var malformed = []Test{
 	{`{{}}`, nil, "", fmt.Errorf("line 1: empty tag")},
 	{`{{}`, nil, "", fmt.Errorf("line 1: unmatched open tag")},
 	{`{{`, nil, "", fmt.Errorf("line 1: unmatched open tag")},
-	//invalid syntax - https://github.com/hoisie/mustache/issues/10
+	// invalid syntax - https://github.com/hoisie/mustache/issues/10
 	{`{{#a}}{{#b}}{{/a}}{{/b}}}`, map[string]interface{}{}, "", fmt.Errorf("line 1: interleaved closing tag: a")},
 }
 

@@ -593,10 +593,6 @@ func renderSection(section *sectionElement, contextChain []interface{}, buf io.W
 		return nil
 	} else if !section.inverted {
 		valueInd := indirect(value)
-		if err = checkAllowed(valueInd); err != nil {
-			return err
-		}
-
 		switch val := valueInd; val.Kind() {
 		case reflect.Slice:
 			for i := 0; i < val.Len(); i++ {

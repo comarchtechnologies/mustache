@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"reflect"
 	"strings"
 	"testing"
 )
@@ -272,8 +271,11 @@ var allowed = []Test{
 	{tmpl: "{{slice}}", context: map[string]interface{}{"slice": []int{1, 2}}, expected: "[1 2]", err: nil},
 	{tmpl: "{{map}}", context: map[string]interface{}{"map": map[string]interface{}{"a": "a"}}, expected: "map[a:a]", err: nil},
 	{tmpl: "{{struct}}", context: map[string]interface{}{"struct": struct{ a int }{1}}, expected: "{1}", err: nil},
-	{tmpl: "{{interface}}", context: map[string]interface{}{"interface": interface{}("a")}, expected: "a", err: nil},
-	{tmpl: "{{ptr}}", context: map[string]interface{}{"ptr": (*int)(nil)}, expected: "&lt;nil&gt;", err: nil},
+
+	{tmpl: "{{hidden_array}}", context: map[string]interface{}{"hidden_array": interface{}([2]int{1, 2})}, expected: "[1 2]", err: nil},
+	{tmpl: "{{hidden_slice}}", context: map[string]interface{}{"hidden_slice": interface{}([]int{1, 2})}, expected: "[1 2]", err: nil},
+	{tmpl: "{{hidden_map}}", context: map[string]interface{}{"hidden_map": interface{}(map[string]interface{}{"a": "a"})}, expected: "map[a:a]", err: nil},
+	{tmpl: "{{hidden_struct}}", context: map[string]interface{}{"hidden_struct": interface{}(struct{ a int }{1})}, expected: "{1}", err: nil},
 }
 
 func TestAllow(t *testing.T) {
@@ -288,14 +290,7 @@ func TestAllow(t *testing.T) {
 	}
 
 	// Now set AllowKinds to primitives and confirm we get errors.
-	AllowKinds = []reflect.Kind{
-		reflect.Bool,
-		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
-		reflect.Float32, reflect.Float64,
-		reflect.Complex64, reflect.Complex128,
-		reflect.String,
-	}
+	AllowKinds = AllowKindsPrimitives
 	defer func() { AllowKinds = nil }()
 	for _, test := range allowed {
 		output, err := Render(test.tmpl, test.context)

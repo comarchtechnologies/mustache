@@ -22,7 +22,17 @@ var (
 	// AllowKinds defines what types of data can be injected into variables.
 	// If data kind retrieved from context does not match one of defined kinds,
 	// an error is generated.
-	AllowKinds []reflect.Kind = nil
+	AllowKinds = AllowKindsAll
+
+	AllowKindsAll []reflect.Kind = nil
+
+	AllowKindsPrimitives = []reflect.Kind{
+		reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Uintptr, reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128,
+		reflect.String,
+	}
 )
 
 // A TagType represents the specific type of mustache tag that a Tag
@@ -906,6 +916,10 @@ func checkAllowed(value reflect.Value) error {
 	if AllowKinds != nil {
 		kind := value.Kind()
 		allowed := false
+
+		if kind == reflect.Ptr || kind == reflect.Interface {
+			kind = value.Elem().Kind()
+		}
 
 		for _, allowedKind := range AllowKinds {
 			if kind == allowedKind {

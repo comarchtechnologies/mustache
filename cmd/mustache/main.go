@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
-	"github.com/cbroglie/mustache"
+	"github.com/comarchtechnologies/mustache"
 )
 
 var rootCmd = &cobra.Command{
@@ -32,6 +32,7 @@ var overrideFile string
 func main() {
 	rootCmd.Flags().StringVar(&layoutFile, "layout", "", "location of layout file")
 	rootCmd.Flags().StringVar(&overrideFile, "override", "", "location of data.yml override yml")
+	rootCmd.Flags().BoolVar(&mustache.AllowMissingVariables, "allow-missing-variables", true, "allow missing variables")
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}

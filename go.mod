@@ -1,9 +1,13 @@
 module github.com/comarchtechnologies/mustache
 
-go 1.14
+go 1.17
 
 require (
-	github.com/golangci/golangci-lint v1.28.3
-	github.com/spf13/cobra v1.0.0
-	gopkg.in/yaml.v2 v2.3.0
+	github.com/spf13/cobra v1.2.1
+	gopkg.in/yaml.v2 v2.4.0
+)
+
+require (
+	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
 )

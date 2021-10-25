@@ -35,6 +35,12 @@ var (
 	}
 )
 
+// RenderFunc is provided to lambda functions for rendering.
+type RenderFunc func(text string) (string, error)
+
+// LambdaFunc is the signature for lambda functions.
+type LambdaFunc func(text string, render RenderFunc) (string, error)
+
 // A TagType represents the specific type of mustache tag that a Tag
 // represents. The zero TagType is not a valid type.
 type TagType uint
@@ -543,7 +549,7 @@ Outer:
 	if allowMissing {
 		return reflect.Value{}, nil
 	}
-	return reflect.Value{}, fmt.Errorf("Missing variable %q", name)
+	return reflect.Value{}, fmt.Errorf("missing variable %q", name)
 }
 
 func isEmpty(v reflect.Value) bool {
@@ -604,6 +610,32 @@ func renderSection(section *sectionElement, contextChain []interface{}, buf io.W
 			}
 		case reflect.Map, reflect.Struct:
 			contexts = append(contexts, value)
+		case reflect.Func:
+			if val.Type().NumIn() != 2 || val.Type().NumOut() != 2 {
+				return fmt.Errorf("lambda %q doesn't match required LambaFunc signature", section.name)
+			}
+			var text bytes.Buffer
+			if err := getSectionText(section.elems, &text); err != nil {
+				return err
+			}
+			render := func(text string) (string, error) {
+				tmpl, err := ParseString(text)
+				if err != nil {
+					return "", err
+				}
+				var buf bytes.Buffer
+				if err := tmpl.renderTemplate(contextChain, &buf); err != nil {
+					return "", err
+				}
+				return buf.String(), nil
+			}
+			in := []reflect.Value{reflect.ValueOf(text.String()), reflect.ValueOf(render)}
+			res := val.Call(in)
+			if !res[1].IsNil() {
+				return fmt.Errorf("lambda %q: %w", section.name, res[1].Interface().(error))
+			}
+			fmt.Fprint(buf, res[0].String())
+			return nil
 		default:
 			// Spec: Non-false sections have their value at the top of context,
 			// accessible as {{.}} or through the parent context. This gives
@@ -624,6 +656,39 @@ func renderSection(section *sectionElement, contextChain []interface{}, buf io.W
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+func getSectionText(elements []interface{}, buf io.Writer) error {
+	for _, element := range elements {
+		if err := getElementText(element, buf); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func getElementText(element interface{}, buf io.Writer) error {
+	switch elem := element.(type) {
+	case *textElement:
+		fmt.Fprintf(buf, "%s", elem.text)
+	case *varElement:
+		fmt.Fprintf(buf, "{{%s}}", elem.name)
+	case *sectionElement:
+		if elem.inverted {
+			fmt.Fprintf(buf, "{{^%s}}", elem.name)
+		} else {
+			fmt.Fprintf(buf, "{{#%s}}", elem.name)
+		}
+		for _, nelem := range elem.elems {
+			if err := getElementText(nelem, buf); err != nil {
+				return err
+			}
+		}
+		fmt.Fprintf(buf, "{{/%s}}", elem.name)
+	default:
+		return fmt.Errorf("unexpected element type %T", elem)
 	}
 	return nil
 }

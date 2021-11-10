@@ -2,6 +2,7 @@ package mustache
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -714,11 +715,24 @@ func renderElement(element interface{}, contextChain []interface{}, buf io.Write
 				return err
 			}
 
-			if elem.raw {
-				fmt.Fprint(buf, val.Interface())
+			k := val.Kind()
+			if k == reflect.Interface || k == reflect.Ptr {
+				k = val.Elem().Kind()
+			}
+
+			if k == reflect.Struct || k == reflect.Slice || k == reflect.Array || k == reflect.Map {
+				var b []byte
+				b, err = json.Marshal(val.Interface())
+				_, err = buf.Write(b)
+			} else if elem.raw {
+				_, err = fmt.Fprint(buf, val.Interface())
 			} else {
 				s := fmt.Sprint(val.Interface())
 				template.HTMLEscape(buf, []byte(s))
+			}
+
+			if err != nil {
+				return err
 			}
 		}
 	case *sectionElement:

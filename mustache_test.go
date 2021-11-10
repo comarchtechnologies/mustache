@@ -21,6 +21,11 @@ type Data struct {
 	B string
 }
 
+type TaggedData struct {
+	A bool   `json:"a"`
+	B string `json:"b"`
+}
+
 type User struct {
 	Name string
 	ID   int64
@@ -205,6 +210,13 @@ var tests = []Test{
 	{`"{{{person.name}}}" == "{{#person}}{{{name}}}{{/person}}"`, map[string]interface{}{"person": map[string]string{"name": "Joe"}}, `"Joe" == "Joe"`, nil},
 	{`"{{a.b.c.d.e.name}}" == "Phil"`, map[string]interface{}{"a": map[string]interface{}{"b": map[string]interface{}{"c": map[string]interface{}{"d": map[string]interface{}{"e": map[string]string{"name": "Phil"}}}}}}, `"Phil" == "Phil"`, nil},
 	{`"{{#a}}{{b.c.d.e.name}}{{/a}}" == "Phil"`, map[string]interface{}{"a": map[string]interface{}{"b": map[string]interface{}{"c": map[string]interface{}{"d": map[string]interface{}{"e": map[string]string{"name": "Phil"}}}}}, "b": map[string]interface{}{"c": map[string]interface{}{"d": map[string]interface{}{"e": map[string]string{"name": "Wrong"}}}}}, `"Phil" == "Phil"`, nil},
+
+	// structs, arrays, maps
+	{`{{struct}}`, map[string]interface{}{"struct": Data{true, "text"}}, `{"A":true,"B":"text"}`, nil},
+	{`{{taggedStruct}}`, map[string]interface{}{"taggedStruct": TaggedData{true, "text"}}, `{"a":true,"b":"text"}`, nil},
+	{`{{slice}}`, map[string]interface{}{"slice": []Data{{true, "1"}, {false, "2"}}}, `[{"A":true,"B":"1"},{"A":false,"B":"2"}]`, nil},
+	{`{{array}}`, map[string]interface{}{"array": [2]Data{{true, "1"}, {false, "2"}}}, `[{"A":true,"B":"1"},{"A":false,"B":"2"}]`, nil},
+	{`{{map}}`, map[string]interface{}{"map": map[string]interface{}{"a": Data{true, "a"}, "B": TaggedData{false, "B"}}}, `{"B":{"a":false,"b":"B"},"a":{"A":true,"B":"a"}}`, nil},
 }
 
 func TestBasic(t *testing.T) {
@@ -267,15 +279,15 @@ func TestMissing(t *testing.T) {
 }
 
 var allowed = []Test{
-	{tmpl: "{{array}}", context: map[string]interface{}{"array": [2]int{1, 2}}, expected: "[1 2]", err: nil},
-	{tmpl: "{{slice}}", context: map[string]interface{}{"slice": []int{1, 2}}, expected: "[1 2]", err: nil},
-	{tmpl: "{{map}}", context: map[string]interface{}{"map": map[string]interface{}{"a": "a"}}, expected: "map[a:a]", err: nil},
-	{tmpl: "{{struct}}", context: map[string]interface{}{"struct": struct{ a int }{1}}, expected: "{1}", err: nil},
+	{tmpl: "{{array}}", context: map[string]interface{}{"array": [2]int{1, 2}}, expected: "[1,2]", err: nil},
+	{tmpl: "{{slice}}", context: map[string]interface{}{"slice": []int{1, 2}}, expected: "[1,2]", err: nil},
+	{tmpl: "{{map}}", context: map[string]interface{}{"map": map[string]interface{}{"a": "a"}}, expected: `{"a":"a"}`, err: nil},
+	{tmpl: "{{struct}}", context: map[string]interface{}{"struct": struct{ A int }{1}}, expected: `{"A":1}`, err: nil},
 
-	{tmpl: "{{hidden_array}}", context: map[string]interface{}{"hidden_array": interface{}([2]int{1, 2})}, expected: "[1 2]", err: nil},
-	{tmpl: "{{hidden_slice}}", context: map[string]interface{}{"hidden_slice": interface{}([]int{1, 2})}, expected: "[1 2]", err: nil},
-	{tmpl: "{{hidden_map}}", context: map[string]interface{}{"hidden_map": interface{}(map[string]interface{}{"a": "a"})}, expected: "map[a:a]", err: nil},
-	{tmpl: "{{hidden_struct}}", context: map[string]interface{}{"hidden_struct": interface{}(struct{ a int }{1})}, expected: "{1}", err: nil},
+	{tmpl: "{{hidden_array}}", context: map[string]interface{}{"hidden_array": interface{}([2]int{1, 2})}, expected: "[1,2]", err: nil},
+	{tmpl: "{{hidden_slice}}", context: map[string]interface{}{"hidden_slice": interface{}([]int{1, 2})}, expected: "[1,2]", err: nil},
+	{tmpl: "{{hidden_map}}", context: map[string]interface{}{"hidden_map": interface{}(map[string]interface{}{"a": "a"})}, expected: `{"a":"a"}`, err: nil},
+	{tmpl: "{{hidden_struct}}", context: map[string]interface{}{"hidden_struct": interface{}(struct{ A int }{1})}, expected: `{"A":1}`, err: nil},
 }
 
 func TestAllow(t *testing.T) {
